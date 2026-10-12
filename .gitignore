@@ -1,0 +1,43 @@
+.env
+node_modules
+
+.env
+.env.local
+.env.*.local
+*.pem
+credentials.json
+
+node_modules/       # Node.js / JavaScript
+venv/               # Python Virtual Environment
+.venv/              # Python Virtual Environment
+vendor/             # PHP / Composer
+
+
+dist/               # Production build folders
+build/              # Build artifacts
+out/                # Output folders
+*.exe               # Compiled executables
+*.dmg
+*.jar
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+
+.DS_Store           # macOS system files
+Thumbs.db           # Windows thumbnail cache
+Ehthumbs.db
+
+
+.idea/              # IntelliJ / WebStorm / PyCharm
+.vscode/            # Visual Studio Code (except extensions.json if shared)
+*.suo
+*.ntvs*
+*.sln
+
+venv
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
