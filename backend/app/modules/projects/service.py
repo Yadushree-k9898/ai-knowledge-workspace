@@ -12,6 +12,8 @@ from app.core.logging import log_security_event, get_logger
 from app.core.exceptions import ResourceNotFound, PermissionDenied
 from app.db.models.project import Project
 from app.db.models.organization_member import OrgRole
+from app.db.models.project_document import ProjectDocument
+from app.db.models.research_report import ResearchReport
 from app.modules.audit.service import record_audit_event
 from app.modules.organizations import repository as org_repo
 from app.modules.projects import repository as repo
@@ -186,15 +188,24 @@ def delete_project(db: Session, *, project_id: str, user_id: str) -> None:
 
 def get_project_summary(db: Session, *, project_id: str, user_id: str) -> dict:
     """
-    Get project summary with counts.
-    TODO: populate document_count, conversation_count, report_count
-    once those modules exist.
+    Get project summary with counts for persisted project resources.
+
+    Chat conversations are not persisted by the current chat implementation,
+    so conversation_count remains zero until conversation history is added.
     """
     project = get_project(db, project_id, user_id)
     return {
         "project_id": project.id,
         "name": project.name,
-        "document_count": 0,      # TODO: query documents table
-        "conversation_count": 0,   # TODO: query conversations table
-        "report_count": 0,         # TODO: query research_reports table
+        "document_count": (
+            db.query(ProjectDocument)
+            .filter(ProjectDocument.project_id == project.id)
+            .count()
+        ),
+        "conversation_count": 0,
+        "report_count": (
+            db.query(ResearchReport)
+            .filter(ResearchReport.project_id == project.id)
+            .count()
+        ),
     }

@@ -4,11 +4,15 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getSupabaseClient } from '../../../lib/supabase';
-import { getProject } from '../../../services/projectService';
+import {
+  getProject,
+  getProjectSummary,
+} from '../../../services/projectService';
 
 export default function ProjectOverviewPage() {
   const { projectId } = useParams();
   const [project, setProject] = useState(null);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -20,7 +24,12 @@ export default function ProjectOverviewPage() {
         await getSupabaseClient().auth.getSession();
       if (sessionError) throw sessionError;
       if (!session) throw new Error('Sign in to view this project.');
-      setProject(await getProject(projectId, session.access_token));
+      const [projectResult, summaryResult] = await Promise.all([
+        getProject(projectId, session.access_token),
+        getProjectSummary(projectId, session.access_token),
+      ]);
+      setProject(projectResult);
+      setSummary(summaryResult);
     } catch (loadError) {
       setError(loadError.message || 'Could not load this project.');
     } finally {
@@ -52,6 +61,20 @@ export default function ProjectOverviewPage() {
               <p className="mt-3 max-w-3xl leading-7 text-slate-600">{project.description || 'No description provided.'}</p>
               <Link href={`/organizations/${encodeURIComponent(project.organization_id)}`} className="mt-3 inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700">Open organization →</Link>
             </header>
+            {summary && (
+              <section aria-label="Project summary" className="mt-8 grid gap-4 sm:grid-cols-3">
+                {[
+                  ['Documents', summary.document_count],
+                  ['Reports', summary.report_count],
+                  ['Conversations', summary.conversation_count],
+                ].map(([label, count]) => (
+                  <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-sm text-slate-500">{label}</p>
+                    <p className="mt-1 text-2xl font-bold">{count}</p>
+                  </div>
+                ))}
+              </section>
+            )}
             <section className="mt-8">
               <h2 className="text-lg font-semibold">Project workspace</h2>
               <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

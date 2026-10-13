@@ -55,3 +55,7 @@ export function createOrganizationProject(organizationId, payload, accessToken) 
 export function getProject(projectId, accessToken) {
   return request(`/projects/${encodeURIComponent(projectId)}`, accessToken);
 }
+
+export function getProjectSummary(projectId, accessToken) {
+  return request(`/projects/${encodeURIComponent(projectId)}/summary`, accessToken);
+}
