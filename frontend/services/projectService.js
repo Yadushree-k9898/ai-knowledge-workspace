@@ -59,3 +59,17 @@ export function getProject(projectId, accessToken) {
 export function getProjectSummary(projectId, accessToken) {
   return request(`/projects/${encodeURIComponent(projectId)}/summary`, accessToken);
 }
+
+export function updateProject(projectId, payload, accessToken) {
+  return request(
+    `/projects/${encodeURIComponent(projectId)}`,
+    accessToken,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+  );
+}
+
+export function deleteProject(projectId, accessToken) {
+  return request(`/projects/${encodeURIComponent(projectId)}`, accessToken, {
+    method: 'DELETE',
+  });
+}
