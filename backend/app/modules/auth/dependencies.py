@@ -64,6 +64,7 @@ def get_current_user(
             settings.SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
             audience="authenticated",
+            options={"require": ["exp", "iat", "sub", "role"]},
         )
     except jwt.ExpiredSignatureError:
         log_security_event(
@@ -82,8 +83,10 @@ def get_current_user(
         raise AuthTokenInvalid(f"Invalid token: {e}")
 
     user_id = payload.get("sub")
-    if not user_id:
+    if not isinstance(user_id, str) or not user_id:
         raise AuthTokenInvalid("Token missing 'sub' claim.")
+    if payload.get("role") != "authenticated":
+        raise AuthTokenInvalid("Token does not represent an authenticated user.")
 
     return {
         "id": user_id,

@@ -32,12 +32,15 @@ def update_profile(
     *,
     display_name: str | None = None,
     avatar_url: str | None = None,
+    clear_avatar: bool = False,
 ) -> Profile:
     """Update mutable profile fields. Only provided values are changed."""
     if display_name is not None:
         profile.display_name = display_name
     if avatar_url is not None:
         profile.avatar_url = avatar_url
+    elif clear_avatar:
+        profile.avatar_url = None
 
     db.commit()
     db.refresh(profile)

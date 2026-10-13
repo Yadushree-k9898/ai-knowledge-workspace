@@ -6,6 +6,7 @@ such as idempotent bootstrap and safe account deletion.
 """
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.core.logging import log_security_event, get_logger
 from app.db.models.profile import Profile
@@ -36,7 +37,14 @@ def bootstrap_user(
         logger.info(f"Bootstrap: profile already exists for user {user_id}")
         return existing, False
 
-    profile = repo.create_profile(db, user_id=user_id, display_name=display_name)
+    try:
+        profile = repo.create_profile(db, user_id=user_id, display_name=display_name)
+    except IntegrityError:
+        db.rollback()
+        profile = repo.get_profile_by_id(db, user_id)
+        if profile is None:
+            raise
+        return profile, False
     log_security_event(
         "PROFILE_CREATED",
         user_id=user_id,
@@ -58,6 +66,7 @@ def update_profile(
     *,
     display_name: str | None = None,
     avatar_url: str | None = None,
+    clear_avatar: bool = False,
     ip_address: str | None = None,
 ) -> Profile:
     """Update the user's profile with any provided fields."""
@@ -66,6 +75,7 @@ def update_profile(
         profile,
         display_name=display_name,
         avatar_url=avatar_url,
+        clear_avatar=clear_avatar,
     )
     log_security_event(
         "PROFILE_UPDATED",

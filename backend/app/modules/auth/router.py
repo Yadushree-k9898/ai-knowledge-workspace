@@ -5,22 +5,20 @@ Endpoints:
     GET    /api/v1/auth/me          — Get current user's profile
     POST   /api/v1/auth/bootstrap   — Create profile after first login (idempotent)
     PATCH  /api/v1/auth/me          — Update profile
-    DELETE /api/v1/auth/me          — Delete account
+    DELETE /api/v1/auth/me          — Account deletion (currently unavailable)
     GET    /api/v1/auth/context     — Get user profile + organizations
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import rate_limit
 from app.db.session import get_db
 from app.db.models.profile import Profile
-from app.core.exceptions import ProfileNotFound
-from app.core.logging import log_security_event
 from app.modules.auth.dependencies import (
     get_current_user,
     get_current_profile,
     get_client_ip,
-    get_request_id,
 )
 from app.modules.auth.schemas import (
     BootstrapRequest,
@@ -28,6 +26,7 @@ from app.modules.auth.schemas import (
     ProfileResponse,
     ProfileUpdateRequest,
     AuthContextResponse,
+    AuthContextOrganization,
 )
 from app.modules.auth import service as auth_service
 
@@ -64,7 +63,12 @@ async def get_me(
 # POST /auth/bootstrap
 # ---------------------------------------------------------------------------
 
-@router.post("/bootstrap", status_code=200, summary="Bootstrap user profile")
+@router.post(
+    "/bootstrap",
+    status_code=200,
+    summary="Bootstrap user profile",
+    dependencies=[Depends(rate_limit("profile-bootstrap", limit=10, window_seconds=3600))],
+)
 async def bootstrap(
     body: BootstrapRequest,
     request: Request,
@@ -107,7 +111,11 @@ async def bootstrap(
 # PATCH /auth/me
 # ---------------------------------------------------------------------------
 
-@router.patch("/me", summary="Update profile")
+@router.patch(
+    "/me",
+    summary="Update profile",
+    dependencies=[Depends(rate_limit("profile-update", limit=20, window_seconds=3600))],
+)
 async def update_me(
     body: ProfileUpdateRequest,
     request: Request,
@@ -125,6 +133,9 @@ async def update_me(
         profile,
         display_name=body.display_name,
         avatar_url=body.avatar_url,
+        clear_avatar=(
+            "avatar_url" in body.model_fields_set and body.avatar_url is None
+        ),
         ip_address=get_client_ip(request),
     )
 
@@ -144,11 +155,14 @@ async def update_me(
 # DELETE /auth/me
 # ---------------------------------------------------------------------------
 
-@router.delete("/me", status_code=200, summary="Delete account")
+@router.delete(
+    "/me",
+    status_code=501,
+    responses={501: {"description": "Full account deletion is not implemented."}},
+    summary="Delete account",
+)
 async def delete_me(
-    request: Request,
-    profile: Profile = Depends(get_current_profile),
-    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     Delete the current user's application profile and all associated data.
@@ -158,17 +172,11 @@ async def delete_me(
     Note: Supabase Auth identity deletion should be handled
     separately on the frontend via supabase.auth.admin.deleteUser().
     """
-    auth_service.delete_account(
-        db,
-        profile,
-        ip_address=get_client_ip(request),
+    _ = user
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Account deletion is unavailable until full identity and data cleanup is implemented.",
     )
-
-    return {
-        "data": {
-            "message": "Account has been deleted successfully.",
-        }
-    }
 
 
 # ---------------------------------------------------------------------------

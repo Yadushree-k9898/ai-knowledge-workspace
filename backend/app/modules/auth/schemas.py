@@ -64,6 +64,8 @@ class ProfileUpdateRequest(BaseModel):
         if v is None:
             return v
         v = v.strip()
+        if not v:
+            return None
         if not v.startswith(("https://", "http://")):
             raise ValueError("Avatar URL must start with https:// or http://")
         return v
