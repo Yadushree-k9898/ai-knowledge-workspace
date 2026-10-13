@@ -9,7 +9,7 @@ Endpoints:
     GET    /api/v1/auth/context     — Get user profile + organizations
 """
 
-from fastapi import APIRouter, Depends, Request, HTTPException, status
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.rate_limit import rate_limit
@@ -157,26 +157,28 @@ async def update_me(
 
 @router.delete(
     "/me",
-    status_code=501,
-    responses={501: {"description": "Full account deletion is not implemented."}},
+    dependencies=[Depends(rate_limit("account-delete", limit=3, window_seconds=3600))],
     summary="Delete account",
 )
 async def delete_me(
+    request: Request,
     user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Delete the current user's application profile and all associated data.
 
     **This action is irreversible.**
 
-    Note: Supabase Auth identity deletion should be handled
-    separately on the frontend via supabase.auth.admin.deleteUser().
+    Organization ownership and project-linked documents must be resolved first.
     """
-    _ = user
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Account deletion is unavailable until full identity and data cleanup is implemented.",
+    auth_service.delete_account(
+        db,
+        user_id=user["id"],
+        email=user.get("email"),
+        ip_address=get_client_ip(request),
     )
+    return {"data": {"message": "Your account and personal application data have been deleted."}}
 
 
 # ---------------------------------------------------------------------------

@@ -69,6 +69,10 @@ export function updateMyProfile(accessToken, updates) {
   });
 }
 
+export function deleteMyAccount(accessToken) {
+  return request('/me', accessToken, { method: 'DELETE' });
+}
+
 export function safeReturnPath(value, fallback = '/dashboard') {
   if (
     typeof value !== 'string'

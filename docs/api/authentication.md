@@ -56,11 +56,18 @@ The profile endpoints require `Authorization: Bearer <access-token>`:
 * `POST /api/v1/auth/bootstrap` creates the application profile idempotently.
 * `GET /api/v1/auth/me` returns the current profile and token email.
 * `PATCH /api/v1/auth/me` updates display name and avatar URL.
+* `DELETE /api/v1/auth/me` permanently deletes the authenticated Supabase
+  identity, profile, personal documents, notifications, and organization
+  memberships. It is limited to three requests per hour.
 * `GET /api/v1/auth/context` returns the profile and organization memberships.
 
-Full account deletion is intentionally unavailable (`DELETE /api/v1/auth/me`
-returns `501`) until Supabase identity deletion and dependent-data cleanup can
-be carried out together. Do not delete profiles directly as a substitute.
+Account deletion requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in
+`backend/.env`. The service-role key must remain server-side and must never be
+exposed to the frontend. Deletion is blocked while the user owns an
+organization or has uploaded documents linked to projects. Transfer ownership
+and transfer or unlink those documents first. Project-shared reports,
+comparisons, and append-only audit history are retained; removed memberships
+are recorded in the organization's audit log.
 
 Profile bootstrap is limited to 10 requests per hour and profile updates to 20
 per hour per authenticated user and direct client IP. See

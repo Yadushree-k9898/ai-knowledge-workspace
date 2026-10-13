@@ -4,6 +4,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Knowledge API"
     DATABASE_URL: str
     SUPABASE_JWT_SECRET: str
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
     GEMINI_API_KEY: str
     REDIS_URL: str = "redis://localhost:6379/0"
     FRONTEND_ORIGIN: str = "http://localhost:3000"

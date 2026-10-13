@@ -48,6 +48,6 @@ def update_profile(
 
 
 def delete_profile(db: Session, profile: Profile) -> None:
-    """Hard-delete a profile row."""
+    """Stage profile deletion in the current database transaction."""
     db.delete(profile)
-    db.commit()
+    db.flush()

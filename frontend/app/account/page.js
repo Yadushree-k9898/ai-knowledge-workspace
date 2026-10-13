@@ -1,10 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getSupabaseClient } from '../../lib/supabase';
-import { getMyProfile, updateMyProfile } from '../../services/authService';
+import {
+  deleteMyAccount,
+  getMyProfile,
+  updateMyProfile,
+} from '../../services/authService';
 
 export default function AccountPage() {
+  const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -12,6 +18,9 @@ export default function AccountPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -75,6 +84,31 @@ export default function AccountPage() {
     }
   }
 
+  async function deleteAccount() {
+    setDeleting(true);
+    setError('');
+    setMessage('');
+    let deleted = false;
+    try {
+      const { data: { session }, error: sessionError } =
+        await getSupabaseClient().auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session) throw new Error('Your session has expired. Sign in again before deleting your account.');
+
+      await deleteMyAccount(session.access_token);
+      deleted = true;
+      const { error: signOutError } = await getSupabaseClient().auth.signOut({ scope: 'local' });
+      if (signOutError) {
+        setError('Your account was deleted, but the local session could not be cleared. Close this browser session.');
+      }
+    } catch (deleteError) {
+      setError(deleteError.message || 'Could not delete your account.');
+    } finally {
+      setDeleting(false);
+      if (deleted) router.replace('/login');
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-2xl">
@@ -132,6 +166,57 @@ export default function AccountPage() {
             </form>
           ) : (
             <p className="text-sm text-slate-600">Profile information is unavailable.</p>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-rose-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-rose-800">Delete account</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            This permanently deletes your sign-in, profile, personal documents, and organization memberships.
+            You must transfer organization ownership and transfer or unlink any documents attached to projects first.
+            Project-shared reports and audit history are retained, including actor IDs recorded for accountability.
+          </p>
+          {!confirmingDelete ? (
+            <button
+              type="button"
+              onClick={() => { setConfirmingDelete(true); setError(''); }}
+              disabled={loading || !profile}
+              className="mt-5 rounded-lg border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+            >
+              Delete my account
+            </button>
+          ) : (
+            <div className="mt-5 max-w-lg">
+              <label htmlFor="delete-account-confirmation" className="block text-sm font-medium text-slate-800">
+                Type DELETE to confirm
+                <input
+                  id="delete-account-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  disabled={deleting}
+                  autoComplete="off"
+                  className="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2.5"
+                />
+              </label>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={deleteAccount}
+                  disabled={deleting || deleteConfirmation !== 'DELETE'}
+                  className="rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting account…' : 'Permanently delete account'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setConfirmingDelete(false); setDeleteConfirmation(''); }}
+                  disabled={deleting}
+                  className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
         </section>
       </div>

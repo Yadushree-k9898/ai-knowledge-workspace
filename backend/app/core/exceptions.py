@@ -116,6 +116,24 @@ class ValidationError(AppError):
         )
 
 
+class AccountDeletionBlocked(AppError):
+    def __init__(self, detail: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            code="ACCOUNT_DELETION_BLOCKED",
+            message=detail,
+        )
+
+
+class ExternalServiceError(AppError):
+    def __init__(self, detail: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            code="EXTERNAL_SERVICE_ERROR",
+            message=detail,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Organization Errors
 # ---------------------------------------------------------------------------
