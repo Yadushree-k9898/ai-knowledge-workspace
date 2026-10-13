@@ -28,7 +28,7 @@ async function request(path, accessToken, options = {}, includeEnvelope = false)
     );
   }
 
-  if (!result?.data) {
+  if (!result || !Object.prototype.hasOwnProperty.call(result, 'data')) {
     throw new Error('The API returned an invalid response.');
   }
 
@@ -37,6 +37,17 @@ async function request(path, accessToken, options = {}, includeEnvelope = false)
 
 export function getInvitation(token) {
   return request(`/invitations/${encodeURIComponent(token)}`);
+}
+
+export function listOrganizations(accessToken) {
+  return request('/organizations', accessToken);
+}
+
+export function createOrganization(name, accessToken) {
+  return request('/organizations', accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
 }
 
 export function acceptInvitation(token, accessToken) {
