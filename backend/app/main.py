@@ -13,6 +13,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from redis.asyncio import Redis
 
 from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
@@ -32,6 +33,11 @@ from app.modules.organizations.router import router as organizations_router
 from app.modules.projects.router import router as projects_router
 from app.modules.documents.router import router as documents_router
 from app.modules.chat.router import router as chat_router
+from app.modules.comparisons.router import router as comparisons_router
+from app.modules.reports.router import router as reports_router
+from app.modules.analytics.router import router as analytics_router
+from app.modules.notifications.router import router as notifications_router
+from app.modules.audit.router import router as audit_router
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -47,17 +53,27 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     """Run DB setup on startup, cleanup on shutdown."""
+    rate_limit_redis = Redis.from_url(
+        settings.REDIS_URL,
+        socket_connect_timeout=2,
+        socket_timeout=2,
+        decode_responses=True,
+    )
+    application.state.rate_limit_redis = rate_limit_redis
     try:
-        logger.info("Initialising database...")
-        with engine.connect() as conn:
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            conn.commit()
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database ready.")
-    except Exception as e:
-        logger.error(f"Database initialisation failed: {e}. App will start but DB-dependent routes may fail.")
-    yield
-    logger.info("Shutting down.")
+        try:
+            logger.info("Initialising database...")
+            with engine.connect() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                conn.commit()
+            Base.metadata.create_all(bind=engine)
+            logger.info("Database ready.")
+        except Exception as e:
+            logger.error(f"Database initialisation failed: {e}. App will start but DB-dependent routes may fail.")
+        yield
+    finally:
+        await rate_limit_redis.close()
+        logger.info("Shutting down.")
 
 # ---------------------------------------------------------------------------
 # Application
@@ -77,7 +93,7 @@ app = FastAPI(
 # CORS must be outermost so preflight OPTIONS work
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=list(dict.fromkeys(["http://localhost:3000", settings.FRONTEND_ORIGIN])),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,6 +109,11 @@ app.include_router(organizations_router)
 app.include_router(projects_router)
 app.include_router(documents_router)
 app.include_router(chat_router)
+app.include_router(comparisons_router)
+app.include_router(reports_router)
+app.include_router(analytics_router)
+app.include_router(notifications_router)
+app.include_router(audit_router)
 
 logger.info("All routers registered.")
 
@@ -127,7 +148,18 @@ async def monitoring_info():
         "data": {
             "app": settings.PROJECT_NAME,
             "version": "0.2.0",
-            "modules_loaded": ["auth", "organizations", "projects", "documents", "chat"],
+            "modules_loaded": [
+                "auth",
+                "organizations",
+                "projects",
+                "documents",
+                "chat",
+                "comparisons",
+                "reports",
+                "analytics",
+                "notifications",
+                "audit",
+            ],
             "endpoints": [
                 {"method": route.methods, "path": route.path}
                 for route in app.routes

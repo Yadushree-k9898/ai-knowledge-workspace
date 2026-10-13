@@ -9,3 +9,5 @@ google-generativeai==0.5.4
 pgvector==0.2.5
 python-multipart==0.0.9
 pypdf==4.2.0
+arq==0.26.3
+redis==4.6.0

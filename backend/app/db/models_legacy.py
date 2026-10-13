@@ -20,6 +20,7 @@ class Document(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+    project_links = relationship("ProjectDocument", back_populates="document", cascade="all, delete-orphan")
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"

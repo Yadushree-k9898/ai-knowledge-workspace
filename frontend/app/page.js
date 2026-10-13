@@ -1,27 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
 export default function Home() {
-  const [backendStatus, setBackendStatus] = useState('Checking...');
-
-  useEffect(() => {
-    fetch('http://localhost:8000/api/v1/health')
-      .then((res) => res.json())
-      .then((data) => setBackendStatus(data.status === 'ok' ? 'Online 🚀' : 'Error'))
-      .catch((err) => setBackendStatus('Offline ❌'));
-  }, []);
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <h1 className="text-4xl font-bold mb-8">AI Knowledge Workspace</h1>
-      
-      <div className="p-6 bg-white rounded-xl shadow-md flex items-center space-x-4">
-        <div>
-          <div className="text-xl font-medium text-black">FastAPI Backend Status</div>
-          <p className="text-gray-500">{backendStatus}</p>
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 text-slate-900">
+      <section className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm sm:p-12">
+        <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">Research together</p>
+        <h1 className="mt-4 text-4xl font-bold tracking-tight">AI Knowledge Workspace</h1>
+        <p className="mx-auto mt-4 max-w-lg leading-7 text-slate-600">
+          Securely organize your team’s documents, research, comparisons, and AI-assisted insights.
+        </p>
+        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <a href="/signup" className="rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700">
+            Create an account
+          </a>
+          <a href="/login" className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold hover:bg-slate-50">
+            Sign in
+          </a>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

@@ -1201,25 +1201,33 @@ We will enforce:
 
 Sensitive actions should be protected from abuse.
 
-Potentially:
+Email/password sign-in, signup, and password recovery are sent directly from
+the browser to Supabase Auth. Their limits must be configured in Supabase; they
+do not pass through FastAPI. FastAPI uses shared Redis fixed-window limits for
+backend operations:
 
 ```text
-Login attempts
-Password reset requests
-Invitation requests
+organization creation       5 / hour
+project creation           20 / hour
+invitation creation         5 / hour
+invitation preview         30 / minute (IP only)
+invitation acceptance      10 / hour
+profile bootstrap          10 / hour
+profile update             20 / hour
+document upload            20 / hour
+comparison creation        10 / hour
+report creation            10 / hour
+report regeneration        10 / hour
 ```
 
-Redis can later enforce counters such as:
+Authenticated operations enforce both per-user and per-IP counters atomically;
+public invitation previews use the direct connection IP. Keys hash identity
+values. Requests over the limit return `429` and `Retry-After`. If Redis is
+unavailable, these sensitive operations fail with `503` rather than silently
+bypassing the limit. Deployments behind a proxy must apply IP-based limits at
+the trusted edge; arbitrary forwarded-IP headers are not trusted by the API.
 
-```text
-email + IP
-IP
-user ID
-```
-
-We will not blindly rate-limit every endpoint from day one.
-
-We will add it where it makes sense.
+See [Rate limiting API notes](docs/api/rate-limits.md).
 
 ---
 
@@ -1268,13 +1276,7 @@ or:
 
 # 36. Audit Logs
 
-Later we will have:
-
-```text
-audit_logs
-```
-
-Example:
+Organization audit logs are persisted for key user-initiated changes:
 
 ```text
 user_id
@@ -1286,16 +1288,23 @@ timestamp
 metadata
 ```
 
-Example:
+The authenticated audit-log endpoint is restricted to organization owners and
+admins. Events are ordered newest-first and can be filtered by action and
+resource type, with bounded pagination. Event metadata contains only
+action-specific identifiers and changed-field/role information; it must not
+include document content, invitation tokens, credentials, or access tokens.
+
+Events are added to the same database transaction as the operation they
+describe. The event table intentionally does not cascade-delete with the
+organization, so organization deletion itself can be recorded. The initial
+event set includes organization, membership, invitation, project, project
+document-link, comparison, and report changes.
 
 ```text
-user_id: 123
-action: DOCUMENT_DELETED
-resource_type: document
-resource_id: 456
+GET /api/v1/organizations/{organization_id}/audit-logs
 ```
 
-This becomes especially useful for a company knowledge platform.
+See [Audit logs API documentation](docs/api/audit-logs.md).
 
 ---
 
@@ -3157,6 +3166,13 @@ average response latency
 AI usage
 ```
 
+The initial analytics endpoint counts project-linked document uploads,
+completed research reports, and distinct users with recorded upload, report, or
+comparison activity. Processing outcomes, processing failures, questions,
+searches, response latency, and AI usage remain unavailable until the product
+persists the required telemetry; the dashboard labels these metrics as not
+tracked instead of showing zero.
+
 ## APIs
 
 ### GET `/organizations/{organization_id}/analytics`
@@ -3215,3 +3231,8 @@ created_at
 ### PATCH `/notifications/{notification_id}/read`
 
 ### PATCH `/notifications/{notification_id}/unread`
+
+The in-app inbox and API are implemented for document processing completion,
+research report completion/failure, and organization invitations. Notifications
+are authenticated and recipient-scoped; the current implementation does not
+send email or push notifications.
