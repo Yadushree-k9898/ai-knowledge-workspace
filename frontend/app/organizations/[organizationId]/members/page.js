@@ -120,7 +120,14 @@ export default function OrganizationMembersPage() {
         session.access_token,
       );
       setInvitationUrl(`${window.location.origin}/invitations/${encodeURIComponent(invitation.token)}`);
-      setMessage(`Invitation created for ${invitation.email}. Share the link before it expires.`);
+      if (invitation.email_delivery?.status === 'sent') {
+        setMessage(invitation.email_delivery.message);
+      } else {
+        setError(
+          invitation.email_delivery?.message ||
+            `Invitation created for ${invitation.email}, but email delivery could not be confirmed. Share the link below.`,
+        );
+      }
       setEmail('');
     } catch (inviteError) {
       setError(inviteError.message || 'Could not create the invitation.');

@@ -46,3 +46,15 @@ is returned as not found.
   recipient's email address.
 
 The inbox is available at `/notifications`.
+
+## Invitation email delivery
+
+When an organization invitation is created, the API also attempts to deliver
+an email using Resend. Configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in
+the backend environment; the sender address must be verified with Resend.
+The API key must remain server-side.
+
+The invitation response includes `email_delivery.status` (`sent`,
+`not_configured`, or `failed`) and a message. Invitation creation is retained
+even if delivery is unavailable, and the response still contains the
+invitation token so an administrator can share the link manually.

@@ -17,6 +17,8 @@ Endpoints:
     POST   /api/v1/invitations/{token}/accept                  — Accept invitation
 """
 
+import asyncio
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,7 @@ from app.core.rate_limit import rate_limit
 from app.db.session import get_db
 from app.modules.auth.dependencies import get_current_user
 from app.modules.organizations import service as org_service
+from app.modules.organizations.email import send_invitation_email
 from app.modules.organizations.schemas import (
     CreateOrganizationRequest,
     UpdateOrganizationRequest,
@@ -243,8 +246,17 @@ async def create_invitation(
         email=body.email,
         role=body.role,
     )
+    organization = org_service.get_organization(db, organization_id)
+    email_delivery = await asyncio.to_thread(
+        send_invitation_email,
+        invitation,
+        organization.name,
+    )
     return {
-        "data": InvitationResponse.model_validate(invitation),
+        "data": {
+            **InvitationResponse.model_validate(invitation).model_dump(mode="json"),
+            "email_delivery": email_delivery,
+        },
     }
 
 

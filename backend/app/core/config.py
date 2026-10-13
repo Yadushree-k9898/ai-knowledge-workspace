@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
     REDIS_URL: str = "redis://localhost:6379/0"
     FRONTEND_ORIGIN: str = "http://localhost:3000"
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
