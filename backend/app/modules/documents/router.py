@@ -11,8 +11,81 @@ from app.services.document_parser import parse_document
 from app.services.chunking_service import chunk_text
 from app.services.embedding_service import generate_embeddings
 from app.modules.notifications.service import create_notification
+from app.modules.documents import service as document_service
 
 router = APIRouter(prefix="/api/v1/documents", tags=["Documents"])
+project_router = APIRouter(prefix="/api/v1/projects", tags=["Project Documents"])
+
+
+@project_router.post(
+    "/{project_id}/documents",
+    status_code=201,
+    dependencies=[Depends(rate_limit("document-upload", limit=20, window_seconds=3600))],
+)
+async def upload_project_document(
+    project_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Upload and process a document in a project the user can modify."""
+    document, chunks_created = document_service.upload_project_document(
+        db,
+        project_id=project_id,
+        user_id=user["id"],
+        filename=file.filename or "",
+        file_bytes=await file.read(),
+    )
+    return {
+        "data": {
+            "id": document.id,
+            "filename": document.filename,
+            "created_at": document.created_at,
+            "chunks_created": chunks_created,
+        }
+    }
+
+
+@project_router.get("/{project_id}/documents")
+async def list_project_documents(
+    project_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """List documents linked to a project the user can access."""
+    documents = document_service.list_project_documents(
+        db,
+        project_id=project_id,
+        user_id=user["id"],
+    )
+    return {
+        "data": [
+            {
+                "id": document.id,
+                "filename": document.filename,
+                "created_at": document.created_at,
+                "added_at": link.added_at,
+            }
+            for document, link in documents
+        ]
+    }
+
+
+@project_router.delete("/{project_id}/documents/{document_id}")
+async def remove_project_document(
+    project_id: str,
+    document_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Remove a document's project link without deleting its underlying data."""
+    document_service.remove_document_from_project(
+        db,
+        project_id=project_id,
+        document_id=document_id,
+        user_id=user["id"],
+    )
+    return {"data": {"message": "Document removed from project."}}
 
 @router.post(
     "/upload",

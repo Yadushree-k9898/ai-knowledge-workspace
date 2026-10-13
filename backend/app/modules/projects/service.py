@@ -85,6 +85,15 @@ def get_project(db: Session, project_id: str, user_id: str) -> Project:
     return project
 
 
+def require_project_write_access(db: Session, project_id: str, user_id: str) -> Project:
+    """Return a project after verifying that the user may modify it."""
+    project = repo.get_project_by_id(db, project_id)
+    if project is None:
+        raise ResourceNotFound("Project")
+    _require_write_access(db, project.organization_id, user_id)
+    return project
+
+
 def list_projects(
     db: Session,
     *,

@@ -32,6 +32,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.organizations.router import router as organizations_router
 from app.modules.projects.router import router as projects_router
 from app.modules.documents.router import router as documents_router
+from app.modules.documents.router import project_router as project_documents_router
 from app.modules.chat.router import router as chat_router
 from app.modules.comparisons.router import router as comparisons_router
 from app.modules.reports.router import router as reports_router
@@ -108,6 +109,7 @@ app.include_router(auth_router)
 app.include_router(organizations_router)
 app.include_router(projects_router)
 app.include_router(documents_router)
+app.include_router(project_documents_router)
 app.include_router(chat_router)
 app.include_router(comparisons_router)
 app.include_router(reports_router)
