@@ -13,6 +13,7 @@ Endpoints:
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import rate_limit
 from app.db.session import get_db
 from app.modules.auth.dependencies import get_current_user
 from app.modules.projects import service as project_service
@@ -35,6 +36,7 @@ router = APIRouter(prefix="/api/v1", tags=["Projects"])
     "/organizations/{organization_id}/projects",
     status_code=201,
     summary="Create project",
+    dependencies=[Depends(rate_limit("project-create", limit=20, window_seconds=3600))],
 )
 async def create_project(
     organization_id: str,

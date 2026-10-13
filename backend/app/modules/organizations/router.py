@@ -20,6 +20,7 @@ Endpoints:
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import rate_limit
 from app.db.session import get_db
 from app.modules.auth.dependencies import get_current_user
 from app.modules.organizations import service as org_service
@@ -42,7 +43,12 @@ router = APIRouter(prefix="/api/v1", tags=["Organizations"])
 # Organization CRUD
 # ---------------------------------------------------------------------------
 
-@router.post("/organizations", status_code=201, summary="Create organization")
+@router.post(
+    "/organizations",
+    status_code=201,
+    summary="Create organization",
+    dependencies=[Depends(rate_limit("organization-create", limit=5, window_seconds=3600))],
+)
 async def create_organization(
     body: CreateOrganizationRequest,
     user: dict = Depends(get_current_user),
@@ -218,6 +224,7 @@ async def remove_member(
     "/organizations/{organization_id}/invitations",
     status_code=201,
     summary="Create invitation",
+    dependencies=[Depends(rate_limit("invitation-create", limit=5, window_seconds=3600))],
 )
 async def create_invitation(
     organization_id: str,
@@ -241,7 +248,20 @@ async def create_invitation(
     }
 
 
-@router.get("/invitations/{token}", summary="Get invitation info")
+@router.get(
+    "/invitations/{token}",
+    summary="Get invitation info",
+    dependencies=[
+        Depends(
+            rate_limit(
+                "invitation-preview",
+                limit=30,
+                window_seconds=60,
+                authenticated=False,
+            )
+        )
+    ],
+)
 async def get_invitation(
     token: str,
     db: Session = Depends(get_db),
@@ -267,7 +287,12 @@ async def get_invitation(
     }
 
 
-@router.post("/invitations/{token}/accept", status_code=200, summary="Accept invitation")
+@router.post(
+    "/invitations/{token}/accept",
+    status_code=200,
+    summary="Accept invitation",
+    dependencies=[Depends(rate_limit("invitation-accept", limit=10, window_seconds=3600))],
+)
 async def accept_invitation(
     token: str,
     user: dict = Depends(get_current_user),
@@ -277,7 +302,12 @@ async def accept_invitation(
     Accept an invitation and join the organization.
     Requires authentication — the accepting user must be logged in.
     """
-    member = org_service.accept_invitation(db, token=token, user_id=user["id"])
+    member = org_service.accept_invitation(
+        db,
+        token=token,
+        user_id=user["id"],
+        email=user.get("email"),
+    )
     return {
         "data": MemberResponse.model_validate(member),
     }

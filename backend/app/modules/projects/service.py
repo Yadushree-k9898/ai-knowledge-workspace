@@ -12,6 +12,7 @@ from app.core.logging import log_security_event, get_logger
 from app.core.exceptions import ResourceNotFound, PermissionDenied
 from app.db.models.project import Project
 from app.db.models.organization_member import OrgRole
+from app.modules.audit.service import record_audit_event
 from app.modules.organizations import repository as org_repo
 from app.modules.projects import repository as repo
 
@@ -51,6 +52,14 @@ def create_project(
         name=name,
         description=description,
         created_by=user_id,
+    )
+    record_audit_event(
+        db,
+        organization_id=org_id,
+        user_id=user_id,
+        action="PROJECT_CREATED",
+        resource_type="project",
+        resource_id=project.id,
     )
     db.commit()
     db.refresh(project)
@@ -104,7 +113,25 @@ def update_project(
         raise ResourceNotFound("Project")
     _require_write_access(db, project.organization_id, user_id)
 
+    changed_fields = [
+        field
+        for field, value, current in (
+            ("name", name, project.name),
+            ("description", description, project.description),
+        )
+        if value is not None and value != current
+    ]
     updated = repo.update_project(db, project, name=name, description=description)
+    if changed_fields:
+        record_audit_event(
+            db,
+            organization_id=project.organization_id,
+            user_id=user_id,
+            action="PROJECT_UPDATED",
+            resource_type="project",
+            resource_id=project_id,
+            metadata={"changed_fields": changed_fields},
+        )
     db.commit()
     db.refresh(updated)
 
@@ -128,6 +155,15 @@ def delete_project(db: Session, *, project_id: str, user_id: str) -> None:
     if member.role not in (OrgRole.OWNER, OrgRole.ADMIN):
         raise PermissionDenied("Only owners and admins can delete projects.")
 
+    organization_id = project.organization_id
+    record_audit_event(
+        db,
+        organization_id=organization_id,
+        user_id=user_id,
+        action="PROJECT_DELETED",
+        resource_type="project",
+        resource_id=project_id,
+    )
     repo.delete_project(db, project)
     db.commit()
 

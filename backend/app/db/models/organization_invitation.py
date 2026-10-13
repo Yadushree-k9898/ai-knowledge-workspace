@@ -48,7 +48,10 @@ class OrganizationInvitation(Base):
     def is_expired(self) -> bool:
         """Check if the invitation has passed its expiry time."""
         from datetime import datetime, timezone
-        return datetime.now(timezone.utc) > self.expires_at
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) > expires_at
 
     @property
     def is_accepted(self) -> bool:

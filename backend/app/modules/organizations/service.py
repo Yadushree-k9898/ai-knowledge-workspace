@@ -26,6 +26,8 @@ from app.core.exceptions import (
 from app.db.models.organization import Organization
 from app.db.models.organization_member import OrganizationMember, OrgRole
 from app.db.models.organization_invitation import OrganizationInvitation
+from app.modules.audit.service import record_audit_event
+from app.modules.notifications.service import create_notification
 from app.modules.organizations import repository as repo
 
 logger = get_logger("organizations.service")
@@ -103,6 +105,14 @@ def create_organization(db: Session, *, user_id: str, name: str) -> Organization
         role=OrgRole.OWNER,
     )
 
+    record_audit_event(
+        db,
+        organization_id=org.id,
+        user_id=user_id,
+        action="ORGANIZATION_CREATED",
+        resource_type="organization",
+        resource_id=org.id,
+    )
     db.commit()
     db.refresh(org)
 
@@ -139,7 +149,18 @@ def update_organization(
     org = get_organization(db, org_id)
     _require_role(db, org_id, user_id, [OrgRole.OWNER, OrgRole.ADMIN])
 
+    changed_fields = ["name"] if name is not None and name != org.name else []
     updated = repo.update_organization(db, org, name=name)
+    if changed_fields:
+        record_audit_event(
+            db,
+            organization_id=org_id,
+            user_id=user_id,
+            action="ORGANIZATION_UPDATED",
+            resource_type="organization",
+            resource_id=org_id,
+            metadata={"changed_fields": changed_fields},
+        )
     db.commit()
     db.refresh(updated)
 
@@ -159,6 +180,14 @@ def delete_organization(db: Session, *, org_id: str, user_id: str) -> None:
     org = get_organization(db, org_id)
     _require_role(db, org_id, user_id, [OrgRole.OWNER])
 
+    record_audit_event(
+        db,
+        organization_id=org_id,
+        user_id=user_id,
+        action="ORGANIZATION_DELETED",
+        resource_type="organization",
+        resource_id=org_id,
+    )
     repo.delete_organization(db, org)
     db.commit()
 
@@ -204,7 +233,17 @@ def update_member_role(
     if new_role == OrgRole.ADMIN:
         _require_role(db, org_id, user_id, [OrgRole.OWNER])
 
+    previous_role = member.role
     updated = repo.update_member_role(db, member, new_role)
+    record_audit_event(
+        db,
+        organization_id=org_id,
+        user_id=user_id,
+        action="MEMBER_ROLE_CHANGED",
+        resource_type="organization_member",
+        resource_id=member_id,
+        metadata={"previous_role": previous_role.value, "new_role": new_role.value},
+    )
     db.commit()
     db.refresh(updated)
 
@@ -234,7 +273,22 @@ def remove_member(db: Session, *, org_id: str, member_id: str, user_id: str) -> 
     if not is_self_removal:
         _require_role(db, org_id, user_id, [OrgRole.OWNER, OrgRole.ADMIN])
 
+    removed_user_id = member.user_id
+    removed_role = member.role.value
     repo.delete_member(db, member)
+    record_audit_event(
+        db,
+        organization_id=org_id,
+        user_id=user_id,
+        action="MEMBER_REMOVED",
+        resource_type="organization_member",
+        resource_id=member_id,
+        metadata={
+            "removed_user_id": removed_user_id,
+            "removed_role": removed_role,
+            "self_removal": is_self_removal,
+        },
+    )
     db.commit()
 
     log_security_event(
@@ -279,6 +333,26 @@ def create_invitation(
         invited_by=user_id,
         expires_at=datetime.now(timezone.utc) + timedelta(days=INVITATION_EXPIRY_DAYS),
     )
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+    if organization is None:
+        raise OrganizationNotFound()
+    create_notification(
+        db,
+        recipient_email=email,
+        notification_type="INVITATION_RECEIVED",
+        title="Organization invitation",
+        message=f"You were invited to join {organization.name} as a {role.value.lower()}.",
+        link=f"/invitations/{invitation.token}",
+    )
+    record_audit_event(
+        db,
+        organization_id=org_id,
+        user_id=user_id,
+        action="INVITATION_CREATED",
+        resource_type="organization_invitation",
+        resource_id=invitation.id,
+        metadata={"role": role.value},
+    )
     db.commit()
     db.refresh(invitation)
 
@@ -299,7 +373,13 @@ def get_invitation(db: Session, token: str) -> OrganizationInvitation:
     return invitation
 
 
-def accept_invitation(db: Session, *, token: str, user_id: str) -> OrganizationMember:
+def accept_invitation(
+    db: Session,
+    *,
+    token: str,
+    user_id: str,
+    email: str | None = None,
+) -> OrganizationMember:
     """
     Accept an invitation and create the membership.
 
@@ -313,6 +393,9 @@ def accept_invitation(db: Session, *, token: str, user_id: str) -> OrganizationM
 
     if invitation.is_expired:
         raise InvitationExpired()
+
+    if email is None or email.strip().casefold() != invitation.email.strip().casefold():
+        raise PermissionDenied("Sign in with the email address that received this invitation.")
 
     # Check if already a member
     existing = repo.get_member(db, invitation.organization_id, user_id)
@@ -329,6 +412,15 @@ def accept_invitation(db: Session, *, token: str, user_id: str) -> OrganizationM
     )
 
     repo.mark_invitation_accepted(db, invitation)
+    record_audit_event(
+        db,
+        organization_id=invitation.organization_id,
+        user_id=user_id,
+        action="INVITATION_ACCEPTED",
+        resource_type="organization_member",
+        resource_id=member.id,
+        metadata={"role": invitation.role.value},
+    )
     db.commit()
     db.refresh(member)
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.exceptions import ResourceNotFound, PermissionDenied
 from app.db.models.project import Project
+from app.db.models.organization_member import OrgRole
 from app.modules.auth.dependencies import get_current_user
 from app.modules.organizations import repository as org_repo
 from app.modules.projects import repository as repo
@@ -30,4 +31,18 @@ def get_project_with_access(
     if member is None:
         raise PermissionDenied("You are not a member of this organization.")
 
+    return project
+
+
+def get_project_with_write_access(
+    project: Project = Depends(get_project_with_access),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Project:
+    """Load a project and ensure viewers cannot modify its resources."""
+    member = org_repo.get_member(db, project.organization_id, user["id"])
+    if member is None:
+        raise PermissionDenied("You are not a member of this organization.")
+    if member.role == OrgRole.VIEWER:
+        raise PermissionDenied("Viewers cannot modify project resources.")
     return project

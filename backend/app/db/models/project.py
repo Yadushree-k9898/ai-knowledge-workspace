@@ -44,6 +44,15 @@ class Project(Base):
 
     # --- Relationships ---
     organization = relationship("Organization", backref="projects")
+    document_links = relationship(
+        "ProjectDocument", back_populates="project", cascade="all, delete-orphan"
+    )
+    comparisons = relationship(
+        "ProjectComparison", back_populates="project", cascade="all, delete-orphan"
+    )
+    reports = relationship(
+        "ResearchReport", back_populates="project", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Project id={self.id} name={self.name!r} org={self.organization_id}>"
