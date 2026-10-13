@@ -174,7 +174,7 @@ export default function AccountPage() {
           <p className="mt-2 text-sm leading-6 text-slate-600">
             This permanently deletes your sign-in, profile, personal documents, and organization memberships.
             You must transfer organization ownership and transfer or unlink any documents attached to projects first.
-            Project-shared reports and audit history are retained, including actor IDs recorded for accountability.
+            Project-shared reports, comparisons, conversations, and audit history are retained, including actor IDs recorded for accountability.
           </p>
           {!confirmingDelete ? (
             <button

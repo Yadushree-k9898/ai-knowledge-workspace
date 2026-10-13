@@ -53,6 +53,9 @@ class Project(Base):
     reports = relationship(
         "ResearchReport", back_populates="project", cascade="all, delete-orphan"
     )
+    conversations = relationship(
+        "Conversation", back_populates="project", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Project id={self.id} name={self.name!r} org={self.organization_id}>"

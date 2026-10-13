@@ -19,6 +19,8 @@ from app.db.models.project import Project
 from app.db.models.project_document import ProjectDocument
 from app.db.models.comparison import ProjectComparison
 from app.db.models.research_report import ResearchReport
+from app.db.models.conversation import Conversation
+from app.db.models.message import Message
 from app.db.models.notification import Notification
 from app.db.models.audit_log import AuditLog
 
@@ -35,6 +37,8 @@ __all__ = [
     "ProjectDocument",
     "ProjectComparison",
     "ResearchReport",
+    "Conversation",
+    "Message",
     "Notification",
     "AuditLog",
 ]

@@ -66,8 +66,9 @@ Account deletion requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in
 exposed to the frontend. Deletion is blocked while the user owns an
 organization or has uploaded documents linked to projects. Transfer ownership
 and transfer or unlink those documents first. Project-shared reports,
-comparisons, and append-only audit history are retained; removed memberships
-are recorded in the organization's audit log.
+comparisons, conversations, and append-only audit history are retained,
+including historical actor IDs in shared records. Removed memberships are
+recorded in the organization's audit log.
 
 Profile bootstrap is limited to 10 requests per hour and profile updates to 20
 per hour per authenticated user and direct client IP. See

@@ -5,6 +5,12 @@ from app.core.rate_limit import rate_limit
 from app.db.session import get_db
 from app.modules.auth.dependencies import get_current_user
 from app.modules.projects import service as project_service
+from app.modules.chat import conversation_service
+from app.modules.chat.schemas import (
+    ConversationDetailEnvelope,
+    ConversationListEnvelope,
+    ConversationRequest,
+)
 from app.services.retrieval_service import search_similar_chunks
 from app.services.chat_service import generate_answer
 
@@ -33,6 +39,85 @@ class ProjectChatRequest(BaseModel):
 
 class ProjectChatResponse(BaseModel):
     data: ChatResponse
+
+
+@project_chat_router.get(
+    "/{project_id}/conversations",
+    response_model=ConversationListEnvelope,
+)
+async def list_project_conversations(
+    project_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    conversations = conversation_service.list_project_conversations(
+        db,
+        project_id=project_id,
+        user_id=user["id"],
+    )
+    return {"data": conversations}
+
+
+@project_chat_router.get(
+    "/{project_id}/conversations/{conversation_id}",
+    response_model=ConversationDetailEnvelope,
+)
+async def get_project_conversation(
+    project_id: str,
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    conversation = conversation_service.get_project_conversation(
+        db,
+        project_id=project_id,
+        conversation_id=conversation_id,
+        user_id=user["id"],
+    )
+    return {"data": conversation}
+
+
+@project_chat_router.post(
+    "/{project_id}/conversations",
+    response_model=ConversationDetailEnvelope,
+    dependencies=[Depends(rate_limit("project-conversation-create", limit=20, window_seconds=60))],
+)
+async def create_project_conversation(
+    project_id: str,
+    request: ConversationRequest,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    conversation = conversation_service.ask_in_project_conversation(
+        db,
+        project_id=project_id,
+        conversation_id=None,
+        user_id=user["id"],
+        query=request.query,
+    )
+    return {"data": conversation}
+
+
+@project_chat_router.post(
+    "/{project_id}/conversations/{conversation_id}/messages",
+    response_model=ConversationDetailEnvelope,
+    dependencies=[Depends(rate_limit("project-conversation-message", limit=20, window_seconds=60))],
+)
+async def add_project_conversation_message(
+    project_id: str,
+    conversation_id: str,
+    request: ConversationRequest,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    conversation = conversation_service.ask_in_project_conversation(
+        db,
+        project_id=project_id,
+        conversation_id=conversation_id,
+        user_id=user["id"],
+        query=request.query,
+    )
+    return {"data": conversation}
 
 
 @project_chat_router.post(

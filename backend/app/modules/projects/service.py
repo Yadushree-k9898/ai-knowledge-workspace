@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.logging import log_security_event, get_logger
 from app.core.exceptions import ResourceNotFound, PermissionDenied
 from app.db.models.project import Project
+from app.db.models.conversation import Conversation
 from app.db.models.organization_member import OrgRole
 from app.db.models.project_document import ProjectDocument
 from app.db.models.research_report import ResearchReport
@@ -190,8 +191,7 @@ def get_project_summary(db: Session, *, project_id: str, user_id: str) -> dict:
     """
     Get project summary with counts for persisted project resources.
 
-    Chat conversations are not persisted by the current chat implementation,
-    so conversation_count remains zero until conversation history is added.
+    Chat conversations are shared with all members of the project.
     """
     project = get_project(db, project_id, user_id)
     return {
@@ -202,7 +202,11 @@ def get_project_summary(db: Session, *, project_id: str, user_id: str) -> dict:
             .filter(ProjectDocument.project_id == project.id)
             .count()
         ),
-        "conversation_count": 0,
+        "conversation_count": (
+            db.query(Conversation)
+            .filter(Conversation.project_id == project.id)
+            .count()
+        ),
         "report_count": (
             db.query(ResearchReport)
             .filter(ResearchReport.project_id == project.id)

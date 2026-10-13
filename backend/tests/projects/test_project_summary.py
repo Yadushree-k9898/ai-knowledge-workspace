@@ -6,6 +6,7 @@ import pytest
 from app.core.exceptions import PermissionDenied
 from app.db.base import Base
 from app.db.models.audit_log import AuditLog
+from app.db.models.conversation import Conversation
 from app.db.models.organization import Organization
 from app.db.models.organization_member import OrganizationMember, OrgRole
 from app.db.models.project import Project
@@ -21,6 +22,7 @@ def project_summary_db():
         Organization.__table__,
         OrganizationMember.__table__,
         Project.__table__,
+        Conversation.__table__,
         Document.__table__,
         ProjectDocument.__table__,
         ResearchReport.__table__,
@@ -58,6 +60,12 @@ def project_summary_db():
                 organization_id="org-1",
                 name="Project Two",
                 created_by="owner-1",
+            ),
+            Conversation(
+                id="conversation-1",
+                project_id="project-1",
+                created_by="owner-1",
+                title="First conversation",
             ),
             Document(id=1, user_id="owner-1", filename="one.pdf", content="One"),
             Document(id=2, user_id="owner-1", filename="two.pdf", content="Two"),
@@ -122,7 +130,7 @@ def test_project_summary_counts_only_resources_linked_to_project(project_summary
         "project_id": "project-1",
         "name": "Project One",
         "document_count": 2,
-        "conversation_count": 0,
+        "conversation_count": 1,
         "report_count": 1,
     }
 
