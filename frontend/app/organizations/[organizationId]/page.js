@@ -5,13 +5,19 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getSupabaseClient } from '../../../lib/supabase';
 import { getOrganizationSettings } from '../../../services/organizationService';
-import { listOrganizationProjects } from '../../../services/projectService';
+import {
+  createOrganizationProject,
+  listOrganizationProjects,
+} from '../../../services/projectService';
 
 export default function OrganizationOverviewPage() {
   const { organizationId } = useParams();
   const [organization, setOrganization] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
   const [loading, setLoading] = useState(true);
+  const [creatingProject, setCreatingProject] = useState(false);
   const [error, setError] = useState('');
 
   const loadOrganization = useCallback(async () => {
@@ -39,6 +45,44 @@ export default function OrganizationOverviewPage() {
   useEffect(() => {
     loadOrganization();
   }, [loadOrganization]);
+
+  async function handleCreateProject(event) {
+    event.preventDefault();
+    const trimmedName = projectName.trim();
+    if (trimmedName.length < 2 || trimmedName.length > 200) {
+      setError('Project name must be between 2 and 200 characters.');
+      return;
+    }
+
+    setCreatingProject(true);
+    setError('');
+    try {
+      const { data: { session }, error: sessionError } =
+        await getSupabaseClient().auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session) {
+        throw new Error('Your session has expired. Sign in again to create a project.');
+      }
+
+      const project = await createOrganizationProject(
+        organizationId,
+        {
+          name: trimmedName,
+          description: projectDescription.trim() || null,
+        },
+        session.access_token,
+      );
+      setProjects((current) => [project, ...current]);
+      setProjectName('');
+      setProjectDescription('');
+    } catch (createError) {
+      setError(createError.message || 'Could not create the project.');
+    } finally {
+      setCreatingProject(false);
+    }
+  }
+
+  const canCreateProject = ['OWNER', 'ADMIN', 'MEMBER'].includes(organization?.role);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:px-6 lg:px-8">
@@ -68,8 +112,49 @@ export default function OrganizationOverviewPage() {
                 </div>
                 <Link href="/projects" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">Manage projects →</Link>
               </div>
+              {canCreateProject && (
+                <form onSubmit={handleCreateProject} className="mt-4 grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2">
+                  <label htmlFor="new-project-name" className="text-sm font-medium">
+                    New project
+                    <input
+                      id="new-project-name"
+                      value={projectName}
+                      onChange={(event) => setProjectName(event.target.value)}
+                      minLength={2}
+                      maxLength={200}
+                      required
+                      disabled={creatingProject}
+                      className="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2.5"
+                      placeholder="Project name"
+                    />
+                  </label>
+                  <label htmlFor="new-project-description" className="text-sm font-medium">
+                    Description <span className="font-normal text-slate-500">(optional)</span>
+                    <textarea
+                      id="new-project-description"
+                      value={projectDescription}
+                      onChange={(event) => setProjectDescription(event.target.value)}
+                      maxLength={2000}
+                      rows={1}
+                      disabled={creatingProject}
+                      className="mt-2 block w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5"
+                      placeholder="What will this project investigate?"
+                    />
+                  </label>
+                  <div className="sm:col-span-2">
+                    <button type="submit" disabled={creatingProject} className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                      {creatingProject ? 'Creating…' : 'Create project'}
+                    </button>
+                  </div>
+                </form>
+              )}
+              {organization.role === 'VIEWER' && (
+                <p className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                  Your viewer role can open projects but cannot create them.
+                </p>
+              )}
               {projects.length === 0 ? (
-                <p className="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">No projects yet. Open project management to create one.</p>
+                <p className="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">No projects yet. Create one here to get started.</p>
               ) : (
                 <ul className="mt-4 grid gap-4 sm:grid-cols-2">
                   {projects.map((project) => (
