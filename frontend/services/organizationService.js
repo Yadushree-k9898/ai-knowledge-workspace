@@ -50,6 +50,41 @@ export function createOrganization(name, accessToken) {
   });
 }
 
+export async function listOrganizationMembers(organizationId, accessToken) {
+  const members = await request(
+    `/organizations/${encodeURIComponent(organizationId)}/members`,
+    accessToken,
+  );
+  if (!Array.isArray(members)) {
+    throw new Error('The API returned an invalid member list.');
+  }
+  return members;
+}
+
+export function updateOrganizationMemberRole(organizationId, memberId, role, accessToken) {
+  return request(
+    `/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(memberId)}`,
+    accessToken,
+    { method: 'PATCH', body: JSON.stringify({ role }) },
+  );
+}
+
+export function removeOrganizationMember(organizationId, memberId, accessToken) {
+  return request(
+    `/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(memberId)}`,
+    accessToken,
+    { method: 'DELETE' },
+  );
+}
+
+export function createOrganizationInvitation(organizationId, payload, accessToken) {
+  return request(
+    `/organizations/${encodeURIComponent(organizationId)}/invitations`,
+    accessToken,
+    { method: 'POST', body: JSON.stringify(payload) },
+  );
+}
+
 export function acceptInvitation(token, accessToken) {
   return request(`/invitations/${encodeURIComponent(token)}/accept`, accessToken, {
     method: 'POST',
