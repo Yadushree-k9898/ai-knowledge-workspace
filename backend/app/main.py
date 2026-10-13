@@ -34,6 +34,8 @@ from app.modules.projects.router import router as projects_router
 from app.modules.documents.router import router as documents_router
 from app.modules.documents.router import project_router as project_documents_router
 from app.modules.chat.router import router as chat_router
+from app.modules.chat.router import project_chat_router
+from app.modules.search.router import router as search_router
 from app.modules.comparisons.router import router as comparisons_router
 from app.modules.reports.router import router as reports_router
 from app.modules.analytics.router import router as analytics_router
@@ -111,6 +113,8 @@ app.include_router(projects_router)
 app.include_router(documents_router)
 app.include_router(project_documents_router)
 app.include_router(chat_router)
+app.include_router(project_chat_router)
+app.include_router(search_router)
 app.include_router(comparisons_router)
 app.include_router(reports_router)
 app.include_router(analytics_router)
@@ -156,6 +160,7 @@ async def monitoring_info():
                 "projects",
                 "documents",
                 "chat",
+                "search",
                 "comparisons",
                 "reports",
                 "analytics",
