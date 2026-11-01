@@ -4,7 +4,7 @@ AI Knowledge API — Application Entry Point
 Wires up:
   - Structured logging
   - Middleware (request ID, error handling, CORS)
-  - Database initialisation (pgvector + table creation)
+  - Database connectivity checks (schema managed by Alembic migrations)
   - All module routers (auth, documents, chat)
   - Health check + monitoring endpoints
 """
@@ -17,11 +17,7 @@ from redis.asyncio import Redis
 
 from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
-from app.db.session import engine, get_db
-from app.db.base import Base
-
-# --- Register ALL models with SQLAlchemy's Base so create_all picks them up ---
-import app.db.models  # noqa: F401  — triggers __init__.py which imports all models
+from app.db.session import get_db
 
 # --- Middleware ---
 from app.middleware.request_id import RequestIDMiddleware
@@ -64,15 +60,7 @@ async def lifespan(application: FastAPI):
     )
     application.state.rate_limit_redis = rate_limit_redis
     try:
-        try:
-            logger.info("Initialising database...")
-            with engine.connect() as conn:
-                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-                conn.commit()
-            Base.metadata.create_all(bind=engine)
-            logger.info("Database ready.")
-        except Exception as e:
-            logger.error(f"Database initialisation failed: {e}. App will start but DB-dependent routes may fail.")
+        logger.info("Application startup complete. Apply database migrations with `alembic upgrade head` before serving traffic.")
         yield
     finally:
         await rate_limit_redis.close()
