@@ -124,7 +124,7 @@ async def retry_project_document(
         document_id=document_id,
         user_id=user["id"],
     )
-    queued = await _enqueue_document_job(job.id)
+    queued = await _enqueue_document_job(job.id, job.attempts + 1)
     return {"data": {"job_id": job.id, "status": job.status, "queued": queued}}
 
 
