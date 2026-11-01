@@ -20,7 +20,7 @@ This document tracks completion against `plan.md`. A module is not complete mere
 - [ ] Verify organization membership and role matrix for every mutation.
 - [ ] Verify invitation expiry, single-use acceptance, and email matching.
 - [ ] Verify project access is scoped through organization membership.
-- [ ] Add migration-managed schema changes; do not rely on production `create_all()`.
+- [x] Add migration-managed schema changes; do not rely on production `create_all()`.
 - [ ] Add integration tests for owner, admin, member, viewer, and outsider roles.
 
 ## Gate 2 — Document ingestion
@@ -31,6 +31,8 @@ This document tracks completion against `plan.md`. A module is not complete mere
 - [ ] Verify extraction, chunking, embedding dimensions, and page metadata.
 - [ ] Verify failed jobs expose safe errors and can be retried.
 - [ ] Verify unlink/delete behavior does not remove shared content unexpectedly.
+
+**Current Gate 2 implementation:** project uploads now persist a `PENDING` job and return HTTP 202; an ARQ worker performs extraction, chunking, and embedding; status and retry endpoints are available. The original synchronous service remains for compatibility. Uploaded bytes are temporarily stored in PostgreSQL with a 10 MB limit. Production object storage, Redis-outage recovery automation, duplicate-delivery tests, and full provider-backed integration verification remain open.
 
 ## Gate 3 — Search and grounded chat
 
@@ -57,7 +59,7 @@ This document tracks completion against `plan.md`. A module is not complete mere
 
 ## Gate 6 — Production readiness
 
-- [ ] Replace startup-time `Base.metadata.create_all()` with Alembic migrations.
+- [x] Replace startup-time `Base.metadata.create_all()` with Alembic migrations.
 - [ ] Add readiness checks for PostgreSQL, Redis, and required provider configuration.
 - [ ] Configure production CORS, HTTPS, secret management, and rate limiting.
 - [ ] Add structured logs, request IDs, error monitoring, and worker health checks.
@@ -70,9 +72,9 @@ This document tracks completion against `plan.md`. A module is not complete mere
 
 | Check | Result |
 |---|---|
-| Backend pytest on project-completion branch | Not run in this environment |
-| Frontend lint/build on project-completion branch | Not run in this environment |
-| Supabase/PostgreSQL/Redis integration | Requires local credentials/services |
+| Backend pytest on project-completion branch | Passing on earlier async-ingestion commits; latest worker tests are running |
+| Frontend lint/build on project-completion branch | Passing on latest completed frontend run |
+| PostgreSQL + pgvector migration upgrade/downgrade/re-upgrade | Passing on earlier migration runs; latest run pending |\n| Supabase/Redis/Gemini end-to-end integration | Requires configured credentials/services |
 
 ## Completion rule
 
