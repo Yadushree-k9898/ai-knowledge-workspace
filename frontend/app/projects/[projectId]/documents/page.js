@@ -5,10 +5,21 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getSupabaseClient } from '../../../../lib/supabase';
 import {
+  getProjectDocumentStatus,
   listProjectDocuments,
   removeProjectDocument,
+  retryProjectDocument,
   uploadProjectDocument,
 } from '../../../../services/documentService';
+
+const ACTIVE_STATUSES = new Set(['PENDING', 'PROCESSING']);
+
+function statusStyle(status) {
+  if (status === 'COMPLETED') return 'bg-emerald-50 text-emerald-700';
+  if (status === 'FAILED') return 'bg-rose-50 text-rose-700';
+  if (status === 'PROCESSING') return 'bg-indigo-50 text-indigo-700';
+  return 'bg-amber-50 text-amber-700';
+}
 
 export default function ProjectDocumentsPage() {
   const { projectId } = useParams();
@@ -18,6 +29,7 @@ export default function ProjectDocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [removingId, setRemovingId] = useState(null);
+  const [retryingId, setRetryingId] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -40,6 +52,51 @@ export default function ProjectDocumentsPage() {
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
+
+  useEffect(() => {
+    const activeDocuments = documents.filter((document) =>
+      ACTIVE_STATUSES.has(document.status),
+    );
+    if (activeDocuments.length === 0) return undefined;
+
+    let cancelled = false;
+    const pollStatuses = async () => {
+      try {
+        const { data: { session }, error: sessionError } =
+          await getSupabaseClient().auth.getSession();
+        if (sessionError || !session) return;
+
+        const updates = await Promise.all(activeDocuments.map(async (document) => {
+          try {
+            const status = await getProjectDocumentStatus(
+              projectId,
+              document.id,
+              session.access_token,
+            );
+            return [document.id, status];
+          } catch {
+            return [document.id, null];
+          }
+        }));
+
+        if (!cancelled) {
+          const statusById = new Map(updates.filter(([, status]) => status));
+          setDocuments((current) => current.map((document) => {
+            const status = statusById.get(document.id);
+            return status ? { ...document, ...status } : document;
+          }));
+        }
+      } catch {
+        // A temporary polling failure should not hide the document list.
+      }
+    };
+
+    const timer = setInterval(pollStatuses, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [documents, projectId]);
 
   async function handleUpload(event) {
     event.preventDefault();
@@ -65,11 +122,47 @@ export default function ProjectDocumentsPage() {
       setDocuments((current) => [uploaded, ...current]);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      setNotice(`${uploaded.filename} was uploaded and processed.`);
+      setNotice(
+        uploaded.queued
+          ? `${uploaded.filename} was uploaded. Processing has started in the background.`
+          : `${uploaded.filename} was saved, but the worker queue could not be reached. Use Retry when Redis is available.`,
+      );
     } catch (uploadError) {
       setError(uploadError.message || 'Could not upload the document.');
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleRetry(document) {
+    setError('');
+    setNotice('');
+    setRetryingId(document.id);
+    try {
+      const { data: { session }, error: sessionError } =
+        await getSupabaseClient().auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session) throw new Error('Your session has expired. Sign in again to retry.');
+
+      const result = await retryProjectDocument(
+        projectId,
+        document.id,
+        session.access_token,
+      );
+      setDocuments((current) => current.map((item) => (
+        item.id === document.id
+          ? { ...item, status: 'PENDING', processing_error: null }
+          : item
+      )));
+      setNotice(
+        result.queued
+          ? `Processing for ${document.filename} has been queued.`
+          : 'The job is saved as pending, but Redis could not be reached. Try again when the worker queue is available.',
+      );
+    } catch (retryError) {
+      setError(retryError.message || 'Could not retry document processing.');
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -126,7 +219,7 @@ export default function ProjectDocumentsPage() {
             Upload a document
           </label>
           <p className="mt-1 text-sm text-slate-500">
-            Supported formats: PDF, TXT, Markdown, CSV, and JSON.
+            PDF, TXT, Markdown, CSV, or JSON. Maximum file size: 10 MB.
           </p>
           <input
             ref={fileInputRef}
@@ -145,7 +238,7 @@ export default function ProjectDocumentsPage() {
             disabled={!selectedFile || uploading}
             className="mt-4 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {uploading ? 'Uploading and processing…' : 'Upload document'}
+            {uploading ? 'Uploading…' : 'Upload document'}
           </button>
         </form>
 
@@ -153,7 +246,7 @@ export default function ProjectDocumentsPage() {
           <div className="border-b border-slate-100 px-6 py-4">
             <h2 className="font-semibold">Project files</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Removing a file here only unlinks it from this project; it does not delete the stored document.
+              Processing continues in the background. This list refreshes status automatically.
             </p>
           </div>
           {loading ? (
@@ -166,18 +259,38 @@ export default function ProjectDocumentsPage() {
                 <li key={document.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate font-medium">{document.filename}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Added {document.added_at ? new Date(document.added_at).toLocaleString() : '—'}
-                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle(document.status || 'COMPLETED')}`}>
+                        {(document.status || 'COMPLETED').toLowerCase()}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        Added {document.added_at ? new Date(document.added_at).toLocaleString() : 'just now'}
+                      </span>
+                    </div>
+                    {document.processing_error && (
+                      <p className="mt-2 text-sm text-rose-700">{document.processing_error}</p>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(document)}
-                    disabled={removingId !== null || uploading}
-                    className="shrink-0 rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {removingId === document.id ? 'Removing…' : 'Remove from project'}
-                  </button>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {(document.status === 'FAILED' || document.status === 'PENDING') && (
+                      <button
+                        type="button"
+                        onClick={() => handleRetry(document)}
+                        disabled={retryingId !== null || uploading || removingId !== null}
+                        className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {retryingId === document.id ? 'Queuing…' : 'Retry processing'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(document)}
+                      disabled={removingId !== null || uploading || retryingId !== null}
+                      className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {removingId === document.id ? 'Removing…' : 'Remove from project'}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
