@@ -144,7 +144,9 @@ async def list_project_documents(
         "filename": document.filename,
         "created_at": document.created_at,
         "added_at": link.added_at,
-    } for document, link in documents]}
+        "status": job.status if job else "COMPLETED",
+        "processing_error": job.error if job else None,
+    } for document, link, job in documents]}
 
 
 @project_router.delete("/{project_id}/documents/{document_id}")
