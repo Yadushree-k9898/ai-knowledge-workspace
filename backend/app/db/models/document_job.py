@@ -6,8 +6,8 @@ from app.db.base import Base
 class DocumentJob(Base):
     __tablename__ = "document_jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    id = Column(Integer, primary_key=True)
+    document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, unique=True)
     project_id = Column(String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     requested_by = Column(String, nullable=False, index=True)
     file_data = Column(LargeBinary, nullable=False)
