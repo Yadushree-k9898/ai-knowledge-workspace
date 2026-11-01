@@ -237,11 +237,12 @@ def retry_project_document_job(
 
 def list_project_documents(
     db: Session, *, project_id: str, user_id: str
-) -> list[tuple[Document, ProjectDocument]]:
+) -> list[tuple[Document, ProjectDocument, DocumentJob | None]]:
     project_service.get_project(db, project_id, user_id)
     return (
-        db.query(Document, ProjectDocument)
+        db.query(Document, ProjectDocument, DocumentJob)
         .join(ProjectDocument, ProjectDocument.document_id == Document.id)
+        .outerjoin(DocumentJob, DocumentJob.document_id == Document.id)
         .filter(ProjectDocument.project_id == project_id)
         .order_by(ProjectDocument.added_at.desc(), Document.id.desc())
         .all()
