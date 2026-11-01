@@ -265,8 +265,8 @@ def test_async_document_job_persists_upload_and_processes_in_worker(
 
     document_service.process_document_job(job.id)
 
-    documents_db.refresh(job)
-    documents_db.refresh(document)
+    job = documents_db.query(DocumentJob).filter_by(id=job.id).one()
+    document = documents_db.query(Document).filter_by(id=document.id).one()
     assert job.status == "COMPLETED"
     assert job.attempts == 1
     assert job.file_data == b""
