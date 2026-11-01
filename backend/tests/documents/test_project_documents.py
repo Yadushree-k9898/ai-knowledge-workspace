@@ -284,6 +284,13 @@ def test_async_document_job_persists_upload_and_processes_in_worker(
         document_id=document.id
     ).count() == 1
 
+    # A duplicate delivery after completion must not create duplicate chunks.
+    document_service.process_document_job(job_id)
+    assert job.attempts == 1
+    assert documents_db.query(DocumentChunk).filter_by(
+        document_id=document.id
+    ).count() == 1
+
 
 def test_async_document_job_rejects_viewer_and_oversized_uploads(documents_db):
     with pytest.raises(PermissionDenied):
