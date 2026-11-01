@@ -28,7 +28,6 @@ def upgrade() -> None:
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.UniqueConstraint("document_id", name="uq_document_jobs_document_id"),
     )
-    op.create_index("ix_document_jobs_document_id", "document_jobs", ["document_id"])
     op.create_index("ix_document_jobs_project_id", "document_jobs", ["project_id"])
     op.create_index("ix_document_jobs_requested_by", "document_jobs", ["requested_by"])
     op.create_index("ix_document_jobs_status", "document_jobs", ["status"])
@@ -38,5 +37,4 @@ def downgrade() -> None:
     op.drop_index("ix_document_jobs_status", table_name="document_jobs")
     op.drop_index("ix_document_jobs_requested_by", table_name="document_jobs")
     op.drop_index("ix_document_jobs_project_id", table_name="document_jobs")
-    op.drop_index("ix_document_jobs_document_id", table_name="document_jobs")
     op.drop_table("document_jobs")
