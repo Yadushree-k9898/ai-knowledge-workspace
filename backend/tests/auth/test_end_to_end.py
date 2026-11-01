@@ -37,13 +37,13 @@ def _request() -> Request:
 def _token(*, role: str = "authenticated", issuer: str | None = None) -> str:
     now = datetime.now(timezone.utc)
     payload = {
-            "sub": "user-1",
-            "email": "user@example.com",
-            "role": role,
-            "aud": "authenticated",
-            "iat": now,
-            "exp": now + timedelta(minutes=5),
-        }
+        "sub": "user-1",
+        "email": "user@example.com",
+        "role": role,
+        "aud": "authenticated",
+        "iat": now,
+        "exp": now + timedelta(minutes=5),
+    }
     if settings.SUPABASE_URL:
         payload["iss"] = issuer or f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1"
     return jwt.encode(payload, settings.SUPABASE_JWT_SECRET, algorithm="HS256")
