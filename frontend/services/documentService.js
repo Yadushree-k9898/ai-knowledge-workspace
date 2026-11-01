@@ -51,6 +51,23 @@ export function uploadProjectDocument(projectId, file, accessToken) {
   });
 }
 
+export function getProjectDocumentStatus(projectId, documentId, accessToken) {
+  return projectDocumentRequest(
+    projectId,
+    accessToken,
+    `/${encodeURIComponent(documentId)}/status`,
+  );
+}
+
+export function retryProjectDocument(projectId, documentId, accessToken) {
+  return projectDocumentRequest(
+    projectId,
+    accessToken,
+    `/${encodeURIComponent(documentId)}/retry`,
+    { method: 'POST' },
+  );
+}
+
 export function removeProjectDocument(projectId, documentId, accessToken) {
   return projectDocumentRequest(
     projectId,
