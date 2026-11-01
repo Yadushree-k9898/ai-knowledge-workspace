@@ -250,6 +250,10 @@ def test_async_document_job_persists_upload_and_processes_in_worker(
     assert job.status == "PENDING"
     assert job.file_data == b"raw research file"
     assert document.content == ""
+    listed = document_service.list_project_documents(
+        documents_db, project_id="project-1", user_id="member-1"
+    )
+    assert listed[0][2].status == "PENDING"
 
     monkeypatch.setattr(
         document_service,
@@ -289,6 +293,15 @@ def test_async_document_job_rejects_viewer_and_oversized_uploads(documents_db):
             user_id="viewer-1",
             filename="research.txt",
             file_bytes=b"research",
+        )
+
+    with pytest.raises(ValidationError):
+        document_service.create_project_document_job(
+            documents_db,
+            project_id="project-1",
+            user_id="member-1",
+            filename="malware.exe",
+            file_bytes=b"not supported",
         )
 
     with pytest.raises(ValidationError):
