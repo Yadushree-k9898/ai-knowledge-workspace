@@ -312,3 +312,44 @@ def test_async_document_job_rejects_viewer_and_oversized_uploads(documents_db):
             filename="research.txt",
             file_bytes=b"x" * (document_service.MAX_UPLOAD_BYTES + 1),
         )
+
+
+
+def test_failed_document_job_keeps_upload_and_can_be_retried(
+    documents_db, monkeypatch
+):
+    document, job = document_service.create_project_document_job(
+        documents_db,
+        project_id="project-1",
+        user_id="member-1",
+        filename="research.txt",
+        file_bytes=b"raw research file",
+    )
+    job_id = job.id
+    monkeypatch.setattr(
+        document_service,
+        "parse_document",
+        lambda filename, file_bytes: (_ for _ in ()).throw(ValueError("invalid document")),
+    )
+    monkeypatch.setattr(
+        document_service,
+        "SessionLocal",
+        lambda: sessionmaker(bind=documents_db.get_bind())(),
+    )
+
+    with pytest.raises(ValueError):
+        document_service.process_document_job(job_id)
+
+    documents_db.refresh(job)
+    assert job.status == "FAILED"
+    assert job.error == "Document processing failed. Please retry the job."
+    assert job.file_data == b"raw research file"
+
+    retried_job = document_service.retry_project_document_job(
+        documents_db,
+        project_id="project-1",
+        document_id=document.id,
+        user_id="member-1",
+    )
+    assert retried_job.status == "PENDING"
+    assert retried_job.error is None
