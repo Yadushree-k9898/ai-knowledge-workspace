@@ -217,10 +217,13 @@ def retry_project_document_job(
     )
     if job is None:
         raise ResourceNotFound("Document job")
+    started_at = job.started_at
+    if started_at is not None and started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
     stale_processing = (
         job.status == "PROCESSING"
-        and job.started_at is not None
-        and job.started_at < datetime.now(timezone.utc) - timedelta(minutes=15)
+        and started_at is not None
+        and started_at < datetime.now(timezone.utc) - timedelta(minutes=15)
     )
     if job.status not in {"FAILED", "PENDING"} and not stale_processing:
         raise ValidationError("Only pending, failed, or stale processing jobs can be retried.")
