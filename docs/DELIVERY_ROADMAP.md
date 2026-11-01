@@ -72,9 +72,9 @@ This document tracks completion against `plan.md`. A module is not complete mere
 
 | Check | Result |
 |---|---|
-| Backend pytest on project-completion branch | Passing on earlier async-ingestion commits; latest worker tests are running |
-| Frontend lint/build on project-completion branch | Passing on latest completed frontend run |
-| PostgreSQL + pgvector migration upgrade/downgrade/re-upgrade | Passing on earlier migration runs; latest run pending |\n| Supabase/Redis/Gemini end-to-end integration | Requires configured credentials/services |
+| Backend pytest on project-completion branch | Passed on commit `2afaf9a` (75 passed) |
+| Frontend lint/build on project-completion branch | Passed on commit `2afaf9a` |
+| PostgreSQL + pgvector migration upgrade/downgrade/re-upgrade | Passed on commit `2afaf9a` |\n| Supabase/Redis/Gemini end-to-end integration | Requires configured credentials/services |
 
 ## Completion rule
 
