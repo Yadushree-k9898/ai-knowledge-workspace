@@ -10,6 +10,7 @@ from app.db.models.organization import Organization
 from app.db.models.organization_member import OrganizationMember, OrgRole
 from app.db.models.project import Project
 from app.db.models.project_document import ProjectDocument
+from app.db.models.document_job import DocumentJob
 from app.modules.documents import service as document_service
 
 
@@ -23,6 +24,7 @@ def documents_db():
         Document.__table__,
         DocumentChunk.__table__,
         ProjectDocument.__table__,
+        DocumentJob.__table__,
         AuditLog.__table__,
     ]
     Base.metadata.create_all(engine, tables=tables)
@@ -230,4 +232,65 @@ def test_upload_rejects_missing_unsupported_or_empty_files(
             user_id="owner-1",
             filename=filename,
             file_bytes=file_bytes,
+        )
+
+
+
+def test_async_document_job_persists_upload_and_processes_in_worker(
+    documents_db, monkeypatch
+):
+    document, job = document_service.create_project_document_job(
+        documents_db,
+        project_id="project-1",
+        user_id="member-1",
+        filename="research.txt",
+        file_bytes=b"raw research file",
+    )
+
+    assert job.status == "PENDING"
+    assert job.file_data == b"raw research file"
+    assert document.content == ""
+
+    monkeypatch.setattr(
+        document_service,
+        "parse_document",
+        lambda filename, file_bytes: "Extracted research content.",
+    )
+    monkeypatch.setattr(
+        document_service,
+        "generate_embeddings",
+        lambda chunks: [[0.0] * 768 for _ in chunks],
+    )
+    monkeypatch.setattr(document_service, "SessionLocal", lambda: documents_db)
+
+    document_service.process_document_job(job.id)
+
+    documents_db.refresh(job)
+    documents_db.refresh(document)
+    assert job.status == "COMPLETED"
+    assert job.attempts == 1
+    assert job.file_data == b""
+    assert document.content == "Extracted research content."
+    assert documents_db.query(DocumentChunk).filter_by(
+        document_id=document.id
+    ).count() == 1
+
+
+def test_async_document_job_rejects_viewer_and_oversized_uploads(documents_db):
+    with pytest.raises(PermissionDenied):
+        document_service.create_project_document_job(
+            documents_db,
+            project_id="project-1",
+            user_id="viewer-1",
+            filename="research.txt",
+            file_bytes=b"research",
+        )
+
+    with pytest.raises(ValidationError):
+        document_service.create_project_document_job(
+            documents_db,
+            project_id="project-1",
+            user_id="member-1",
+            filename="research.txt",
+            file_bytes=b"x" * (document_service.MAX_UPLOAD_BYTES + 1),
         )
