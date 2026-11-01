@@ -29,7 +29,7 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 async def _enqueue_document_job(job_id: int, attempt: int) -> bool:
-    """Queue a committed job; its database record survives a Redis outage."""
+    """Queue a committed job or recognize an existing deterministic ARQ job ID."""
     redis = None
     try:
         redis = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
@@ -38,7 +38,8 @@ async def _enqueue_document_job(job_id: int, attempt: int) -> bool:
             job_id,
             _job_id=f"document-{job_id}-attempt-{attempt}",
         )
-        return result is not None
+        # ARQ returns None when this deterministic job ID already exists in Redis.
+        return True
     except Exception:
         logger.exception("Could not enqueue document job %s; it remains pending.", job_id)
         return False
