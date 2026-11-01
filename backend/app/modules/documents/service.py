@@ -17,6 +17,7 @@ from app.services.embedding_service import generate_embeddings
 
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".csv", ".json"}
 
 
 
@@ -87,6 +88,9 @@ def create_project_document_job(
     safe_filename = filename.replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not safe_filename:
         raise ValidationError("A file name is required.")
+    extension = "." + safe_filename.rsplit(".", 1)[-1].lower() if "." in safe_filename else ""
+    if extension not in SUPPORTED_EXTENSIONS:
+        raise ValidationError("Unsupported file type. Supported: PDF, TXT, Markdown, CSV, and JSON.")
     if not file_bytes:
         raise ValidationError("Empty files cannot be uploaded.")
     if len(file_bytes) > MAX_UPLOAD_BYTES:
