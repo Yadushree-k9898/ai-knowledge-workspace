@@ -59,12 +59,25 @@ def get_current_user(
     token = credentials.credentials
 
     try:
+        # Supabase access tokens identify the issuing project. Validate the
+        # issuer whenever SUPABASE_URL is configured so a token signed with a
+        # different project's secret/configuration cannot be accepted here.
+        issuer = (
+            f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1"
+            if settings.SUPABASE_URL
+            else None
+        )
+        required_claims = ["exp", "iat", "sub", "role"]
+        if issuer:
+            required_claims.append("iss")
+
         payload = jwt.decode(
             token,
             settings.SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
             audience="authenticated",
-            options={"require": ["exp", "iat", "sub", "role"]},
+            issuer=issuer,
+            options={"require": required_claims},
         )
     except jwt.ExpiredSignatureError:
         log_security_event(
