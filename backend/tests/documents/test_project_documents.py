@@ -326,11 +326,10 @@ def test_failed_document_job_keeps_upload_and_can_be_retried(
         file_bytes=b"raw research file",
     )
     job_id = job.id
-    monkeypatch.setattr(
-        document_service,
-        "parse_document",
-        lambda filename, file_bytes: (_ for _ in ()).throw(ValueError("invalid document")),
-    )
+    def fail_parse(filename, file_bytes):
+        raise ValueError("invalid document")
+
+    monkeypatch.setattr(document_service, "parse_document", fail_parse)
     monkeypatch.setattr(
         document_service,
         "SessionLocal",
