@@ -1,0 +1,182 @@
+# AI Knowledge & Research Workspace
+
+A multi-tenant research workspace for teams to organize projects, upload documents, search their knowledge, and ask evidence-grounded questions with source citations.
+
+> **Project status:** Active development. The repository contains working feature modules, but not every planned capability has completed end-to-end verification. See [the delivery roadmap](docs/DELIVERY_ROADMAP.md) before treating this as production-ready.
+
+## Product capabilities
+
+- Supabase Auth-backed user identity and FastAPI-protected APIs
+- Organizations, memberships, invitations, roles, and projects
+- Project-linked document uploads and text extraction
+- Vector retrieval with pgvector and project-scoped search
+- Project conversations with retrieved source references
+- Research reports and document comparisons
+- Organization analytics, notifications, and audit events
+- Redis/ARQ background-job infrastructure
+
+Some advanced analytics and external notification channels are intentionally reported as unavailable until their telemetry/integrations are implemented.
+
+## Architecture
+
+```text
+Browser
+  └── Next.js 14 / React / JavaScript / Tailwind
+       ├── Supabase Auth (identity + session)
+       └── FastAPI /api/v1
+            ├── Auth + authorization
+            ├── Modular business APIs
+            ├── PostgreSQL + pgvector
+            ├── Supabase Storage (optional file storage integration)
+            └── Redis → ARQ worker → document/report/comparison jobs
+                                      └── Gemini API
+```
+
+The backend is a modular monolith. Modules own their routes, schemas, services, and repositories; reusable infrastructure lives under `app/core`, `app/db`, `app/services`, and `app/workers`.
+
+## Repository layout
+
+- `frontend/` — Next.js application (JavaScript/JSX)
+- `backend/app/modules/` — business feature modules
+- `backend/app/services/` — document, embedding, and retrieval services
+- `backend/app/workers/` — ARQ worker configuration and jobs
+- `backend/tests/` — backend automated tests
+- `docs/` — API and system-design documentation
+- `plan.md` — original product and architecture plan
+
+## Prerequisites
+
+- Node.js 20+
+- Python 3.11+
+- PostgreSQL with the pgvector extension (or a Supabase Postgres project)
+- Redis 7+
+- Supabase project (Auth and JWT configuration)
+- Gemini API key for live AI generation
+
+## Local setup
+
+### 1. Configure environment
+
+Copy the examples:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env.local
+```
+
+Fill in real values locally. Never commit `.env`, `.env.local`, service-role keys, JWT secrets, or provider API keys.
+
+Backend variables:
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SUPABASE_JWT_SECRET` | Secret used by the current JWT verification implementation |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase service role key; keep secret |
+| `GEMINI_API_KEY` | Gemini provider key |
+| `REDIS_URL` | Redis connection URL |
+| `FRONTEND_ORIGIN` | Allowed frontend origin |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Optional email delivery configuration |
+
+Frontend variables:
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | FastAPI base URL, e.g. `http://localhost:8000` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase public anon key |
+
+### 2. Start infrastructure
+
+The root Compose file starts PostgreSQL with pgvector and Redis:
+
+```bash
+docker compose up -d
+```
+
+If using Supabase Postgres instead, configure `DATABASE_URL` accordingly and start only Redis locally.
+
+### 3. Start the backend
+
+```bash
+cd backend
+python -m venv .venv
+# macOS/Linux
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+API docs: http://127.0.0.1:8000/docs
+
+### 4. Start the ARQ worker
+
+In another terminal, activate the same backend virtual environment:
+
+```bash
+cd backend
+arq app.workers.worker.WorkerSettings
+```
+
+### 5. Start the frontend
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open http://localhost:3000.
+
+## Tests and quality checks
+
+Backend:
+
+```bash
+cd backend
+pytest
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm ci
+npm run lint
+npm run build
+```
+
+The CI workflows run backend tests and frontend lint/build on pushes and pull requests. External services and credentials are not required for the unit-test job; tests should mock provider calls.
+
+## API conventions
+
+- API prefix: `/api/v1`
+- Protected endpoints use `Authorization: Bearer <Supabase access token>`
+- The backend derives the current user from the verified token. Never accept a client-supplied `user_id` as the identity of the caller.
+- Organization and project access must be checked server-side on every protected resource operation.
+- Long-running work belongs in background jobs rather than blocking request handlers.
+
+## Security notes
+
+- Use a least-privilege database role in deployed environments.
+- Keep Supabase service-role credentials and provider keys server-side only.
+- Restrict CORS to the deployed frontend origin.
+- Configure HTTPS, secure deployment secrets, database backups, rate limits, and monitoring before production use.
+- Review the security and migration checklist in `docs/DELIVERY_ROADMAP.md`.
+
+## Delivery roadmap
+
+See [docs/DELIVERY_ROADMAP.md](docs/DELIVERY_ROADMAP.md) for the staged completion checklist, verification gates, and known production-readiness work.
+
+## License
+
+No license has been selected yet. Until one is added, the repository's contents remain subject to the default copyright rules.
