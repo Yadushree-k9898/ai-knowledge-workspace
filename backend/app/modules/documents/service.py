@@ -1,6 +1,6 @@
 """Project-scoped document upload, processing, listing, and unlink operations."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -217,8 +217,13 @@ def retry_project_document_job(
     )
     if job is None:
         raise ResourceNotFound("Document job")
-    if job.status not in {"FAILED", "PENDING"}:
-        raise ValidationError("Only pending or failed document jobs can be retried.")
+    stale_processing = (
+        job.status == "PROCESSING"
+        and job.started_at is not None
+        and job.started_at < datetime.now(timezone.utc) - timedelta(minutes=15)
+    )
+    if job.status not in {"FAILED", "PENDING"} and not stale_processing:
+        raise ValidationError("Only pending, failed, or stale processing jobs can be retried.")
     job.status = "PENDING"
     job.error = None
     job.finished_at = None
