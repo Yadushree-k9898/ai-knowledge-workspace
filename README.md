@@ -8,7 +8,8 @@ A multi-tenant research workspace for teams to organize projects, upload documen
 
 - Supabase Auth-backed user identity and FastAPI-protected APIs
 - Organizations, memberships, invitations, roles, and projects
-- Project-linked document uploads and text extraction
+- Project-linked document uploads with asynchronous extraction, chunking, and embedding
+- Document-processing status and retry endpoints backed by PostgreSQL job records and Redis/ARQ
 - Vector retrieval with pgvector and project-scoped search
 - Project conversations with retrieved source references
 - Research reports and document comparisons
@@ -139,6 +140,10 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 API docs: http://127.0.0.1:8000/docs
 
 ### 5. Start the ARQ worker
+
+Project document uploads return HTTP 202 after the file and job are committed. The ARQ worker extracts text, creates chunks, and generates embeddings in the background. Poll `GET /api/v1/projects/{project_id}/documents/{document_id}/status` for `PENDING`, `PROCESSING`, `COMPLETED`, or `FAILED`. Failed jobs can be retried with `POST /api/v1/projects/{project_id}/documents/{document_id}/retry`.
+
+The current implementation temporarily stores the uploaded file bytes in the `document_jobs` PostgreSQL row (10 MB limit). For production scale, move raw uploads to private object storage and keep only a storage key in the job row.
 
 In another terminal, activate the same backend virtual environment:
 
