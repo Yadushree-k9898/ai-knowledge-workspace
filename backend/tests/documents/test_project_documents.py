@@ -261,12 +261,17 @@ def test_async_document_job_persists_upload_and_processes_in_worker(
         "generate_embeddings",
         lambda chunks: [[0.0] * 768 for _ in chunks],
     )
-    monkeypatch.setattr(document_service, "SessionLocal", lambda: documents_db)
+    job_id = job.id
+    monkeypatch.setattr(
+        document_service,
+        "SessionLocal",
+        lambda: sessionmaker(bind=documents_db.get_bind())(),
+    )
 
-    document_service.process_document_job(job.id)
+    document_service.process_document_job(job_id)
 
-    job = documents_db.query(DocumentJob).filter_by(id=job.id).one()
-    document = documents_db.query(Document).filter_by(id=document.id).one()
+    documents_db.refresh(job)
+    documents_db.refresh(document)
     assert job.status == "COMPLETED"
     assert job.attempts == 1
     assert job.file_data == b""
