@@ -34,20 +34,19 @@ def _request() -> Request:
     )
 
 
-def _token(*, role: str = "authenticated") -> str:
+def _token(*, role: str = "authenticated", issuer: str | None = None) -> str:
     now = datetime.now(timezone.utc)
-    return jwt.encode(
-        {
+    payload = {
             "sub": "user-1",
             "email": "user@example.com",
             "role": role,
             "aud": "authenticated",
             "iat": now,
             "exp": now + timedelta(minutes=5),
-        },
-        settings.SUPABASE_JWT_SECRET,
-        algorithm="HS256",
-    )
+        }
+    if settings.SUPABASE_URL:
+        payload["iss"] = issuer or f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1"
+    return jwt.encode(payload, settings.SUPABASE_JWT_SECRET, algorithm="HS256")
 
 
 def test_current_user_requires_authenticated_supabase_role():
@@ -66,6 +65,16 @@ def test_current_user_requires_authenticated_supabase_role():
                 credentials=_token(role="anon"),
             ),
         )
+
+    if settings.SUPABASE_URL:
+        with pytest.raises(AuthTokenInvalid):
+            get_current_user(
+                _request(),
+                HTTPAuthorizationCredentials(
+                    scheme="Bearer",
+                    credentials=_token(issuer="https://another-project.supabase.co/auth/v1"),
+                ),
+            )
 
 
 def test_profile_bootstrap_is_idempotent():
