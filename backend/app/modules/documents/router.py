@@ -28,7 +28,7 @@ project_router = APIRouter(prefix="/api/v1/projects", tags=["Project Documents"]
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
-async def _enqueue_document_job(job_id: int) -> bool:
+async def _enqueue_document_job(job_id: int, attempt: int) -> bool:
     """Queue a committed job; its database record survives a Redis outage."""
     redis = None
     try:
@@ -36,7 +36,7 @@ async def _enqueue_document_job(job_id: int) -> bool:
         result = await redis.enqueue_job(
             "process_document",
             job_id,
-            _job_id=f"document-{job_id}",
+            _job_id=f"document-{job_id}-attempt-{attempt}",
         )
         return result is not None
     except Exception:
@@ -70,7 +70,7 @@ async def upload_project_document(
         filename=file.filename or "",
         file_bytes=file_bytes,
     )
-    queued = await _enqueue_document_job(job.id)
+    queued = await _enqueue_document_job(job.id, job.attempts + 1)
     return {
         "data": {
             "id": document.id,
