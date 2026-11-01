@@ -14,8 +14,11 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable-anon-key>
 ```
 
-Set `SUPABASE_JWT_SECRET` for the same Supabase project in
-`backend/.env`. For a deployed frontend, set `FRONTEND_ORIGIN` in
+Set `SUPABASE_JWT_SECRET` and `SUPABASE_URL` for the same Supabase project in
+`backend/.env`. The API validates the JWT signature, expiry, authenticated
+role, audience, and the project issuer (`<SUPABASE_URL>/auth/v1`). Do not use a
+JWT secret or URL from a different Supabase project. For a deployed frontend,
+set `FRONTEND_ORIGIN` in
 `backend/.env` to its exact origin so API CORS allows the app.
 Enable email confirmations in Supabase Auth if users must verify ownership of
 their email before signing in.
